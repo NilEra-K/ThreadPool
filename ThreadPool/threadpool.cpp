@@ -4,7 +4,7 @@
 #include <iostream>
 #include <chrono>
 
-const size_t TASK_QUEUE_MAX_THRESHOLD = 1024;
+const size_t TASK_QUEUE_MAX_THRESHOLD = 4;
 
 // 线程池构造
 ThreadPool::ThreadPool()
@@ -44,8 +44,8 @@ void ThreadPool::submitTask(std::shared_ptr<Task> sp_task) {
 	// while (taskQueue.size() == taskQueueMaxThreshold_) {
 	//     this->notFull_.wait(lock);
 	// }
-	if (!notFull_.wait_for(lock, std::chrono::seconds(1), 
-		[&]()->bool { return taskQueue.size() < taskQueueMaxThreshold_; })) {
+	if (!notFull_.wait_for(lock, std::chrono::microseconds(100), 
+		[&]()->bool { return taskQueue_.size() < taskQueueMaxThreshold_; })) {
 		// notNull_.wait_for(...) 等待 1s 后, 发现还是不满足条件, 则返回 false
 		// 当不满足条件时, 则进行输出
 		std::cerr << ">>> [ERROR] taskQueue IS FULL, Submit Task Failed..." << std::endl;
@@ -53,7 +53,7 @@ void ThreadPool::submitTask(std::shared_ptr<Task> sp_task) {
 	}
 
 	// 如果有空余, 将任务放入任务队列中
-	taskQueue.emplace(sp_task);
+	taskQueue_.emplace(sp_task);
 	taskSize_++;
 
 	// 因为新放了任务, 所以任务队列一定不空, 在 notNull_ 进行通知 -> 赶紧通知线程池执行任务
@@ -90,19 +90,22 @@ void ThreadPool::threadFunc() {
 		{
 			// 先获取锁
 			std::unique_lock<std::mutex> lock(this->taskQueueMtx_);
+			std::cout << ">>> [LOGS] tid: " << std::this_thread::get_id() << " - 尝试获取任务..." << std::endl;
 
 			// 等待 notNull_ 条件
 			notNull_.wait(lock, [&]()->bool { return taskQueue.size() > 0; });
+			std::cout << ">>> [LOGS] tid: " << std::this_thread::get_id() << " - 获取任务成功..." << std::endl;
+
 
 			// 从任务队列中, 取一个任务出来, 取出任务后释放锁
 			// 如果不释放, 我们就需要等待其出, for 循环作用域, 此时任务已经执行完毕才释放锁
 			// 这就会造成线程池中只有一个线程在工作的现象
-			task = taskQueue.front();
-			taskQueue.pop();
+			task = taskQueue_.front();
+			taskQueue_.pop();
 			taskSize_--;
 
 			// 如果仍有剩余任务, 继续通知其他线程执行任务
-			if (taskQueue.size() > 0) {
+			if (taskQueue_.size() > 0) {
 				notNull_.notify_all();
 			}
 
@@ -115,7 +118,7 @@ void ThreadPool::threadFunc() {
 			task->run();
 		}
 	}
-	std::cout << "  End Thread Function, tid: " << std::this_thread::get_id() << std::endl;
+	std::cout << ">>> [LOGS]  End Thread Function, tid: " << std::this_thread::get_id() << std::endl;
 }
 
 //////////// 线程方法的实现

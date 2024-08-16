@@ -19,7 +19,7 @@ private:
 
 
 // 线程池支持的模式
-// enum class 运行程序员以 ThreadPoolMode::MODE_FIXED 方式进行枚举量的使用
+// enum class 允许程序员以 ThreadPoolMode::MODE_FIXED 方式进行枚举量的使用
 // 防止出现枚举中出现相同命名的枚举量
 enum class ThreadPoolMode {
 	MODE_FIXED,		// 固定数量的线程
@@ -46,9 +46,20 @@ private:
 
 // 抽象线程池类型
 /**
- * example:
+ * -- example:
+ * -- How To Use ThreadPool Class?
+ * 
  * ThreadPool pool;
- * pool 
+ * pool.start();
+ * 
+ * class MyTask : public Task {
+ * public:
+ *     void run() {
+ *         // 线程代码...
+ *     }
+ * };
+ * 
+ * pool.submitTask(std::make_shared<MyTask>());
  */
 class ThreadPool {
 public:
@@ -83,7 +94,7 @@ private:
 	size_t initThreadSize_;							// 初始线程数量
 	ThreadPoolMode poolMode_;						// 当前线程池的工作模式
 
-	std::queue<std::shared_ptr<Task>> taskQueue;	// 任务队列
+	std::queue<std::shared_ptr<Task>> taskQueue_;	// 任务队列
 	std::atomic_size_t taskSize_;					// 任务队列中任务数量
 	size_t taskQueueMaxThreshold_;					// 任务队列中任务数量的最大阈值
 	std::mutex taskQueueMtx_;						// 用于保证任务队列的线程安全
